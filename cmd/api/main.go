@@ -35,10 +35,17 @@ func main() {
 	serviceRepository := service.NewRepository(db)
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("GET /health", healthHandler)
+
 	mux.HandleFunc(
 		"POST /services",
 		createServiceHandler(serviceRepository),
+	)
+
+	mux.HandleFunc(
+		"GET /services",
+		listServicesHandler(serviceRepository),
 	)
 
 	address := ":8080"
