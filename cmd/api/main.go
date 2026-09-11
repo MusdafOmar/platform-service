@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/MusdafOmar/platform-service/internal/database"
+	"github.com/MusdafOmar/platform-service/internal/service"
 	"github.com/MusdafOmar/platform-service/migrations"
 )
 
@@ -31,8 +32,14 @@ func main() {
 		log.Fatalf("apply database migrations: %v", err)
 	}
 
+	serviceRepository := service.NewRepository(db)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc(
+		"POST /services",
+		createServiceHandler(serviceRepository),
+	)
 
 	address := ":8080"
 
