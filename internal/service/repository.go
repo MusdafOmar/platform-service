@@ -51,7 +51,7 @@ func (repository *Repository) Create(
 		ctx,
 		`
 			INSERT INTO services (id, name, description, created_at)
-			VALUES (?, ?, ?, ?)
+			VALUES ($1, $2, $3, $4)
 		`,
 		record.ID,
 		record.Name,

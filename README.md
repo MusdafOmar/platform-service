@@ -1,12 +1,12 @@
 # Platform Service
 
-A learning-focused platform and service project built for LIA preparation.
+A learning-focused platform and service project built for LIA preparation at Kaerus Software.
 
-The project will combine:
+The project combines:
 
 - Go REST API
-- PostgreSQL, SQLite and CockroachDB
-- Docker
+- SQLite, PostgreSQL and CockroachDB
+- Docker Compose
 - Terraform on Google Cloud
 - Makefile automation
 - Integration tests
@@ -14,7 +14,16 @@ The project will combine:
 
 ## Current status
 
-The service currently provides a health endpoint and an automated test.
+The API currently provides:
+
+- `GET /health`
+- `POST /services`
+- `GET /services`
+- SQLite support
+- PostgreSQL support through pgx
+- Automatic database migrations
+- Docker Compose for local PostgreSQL
+- Unit and HTTP handler tests
 
 ## Requirements
 
@@ -25,11 +34,55 @@ The service currently provides a health endpoint and an automated test.
 - Terraform
 - Google Cloud CLI
 
-## Run locally
+## Run with SQLite
+
+SQLite is the default database:
 
 ```bash
 make run
 ```
+
+The local database is stored in:
+
+```text
+platform-service.db
+```
+
+## Run with PostgreSQL
+
+Create the private environment file:
+
+```bash
+cp deployments/docker/.env.example deployments/docker/.env
+```
+
+Start PostgreSQL:
+
+```bash
+make postgres-up
+```
+
+Check its status:
+
+```bash
+make postgres-status
+```
+
+Run the API with PostgreSQL:
+
+```bash
+make run-postgres
+```
+
+Stop PostgreSQL:
+
+```bash
+make postgres-down
+```
+
+The named Docker volume preserves the PostgreSQL data when the container is stopped.
+
+## API address
 
 The API starts at:
 
@@ -49,6 +102,22 @@ Expected response:
 {"status":"ok","service":"platform-service"}
 ```
 
+## Create a service
+
+```bash
+curl \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"name":"catalog-api","description":"LIA platform service"}' \
+  http://localhost:8080/services
+```
+
+## List services
+
+```bash
+curl http://localhost:8080/services
+```
+
 ## Available Make commands
 
 ```bash
@@ -56,9 +125,13 @@ make help
 make fmt
 make test
 make run
+make run-postgres
 make build
 make check
 make clean
+make postgres-up
+make postgres-down
+make postgres-status
 ```
 
 ## Project structure
@@ -68,21 +141,41 @@ platform-service/
 ├── cmd/
 │   └── api/
 │       ├── main.go
-│       └── main_test.go
+│       ├── main_test.go
+│       ├── services.go
+│       ├── services_test.go
+│       ├── list_services.go
+│       └── list_services_test.go
+├── deployments/
+│   └── docker/
+│       ├── .env.example
+│       └── compose.yaml
+├── internal/
+│   ├── database/
+│   └── service/
+├── migrations/
+│   ├── 001_create_services.sql
+│   ├── migrations.go
+│   └── migrations_test.go
+├── tests/
+│   └── integration/
 ├── .gitignore
 ├── go.mod
+├── go.sum
 ├── Makefile
 └── README.md
 ```
 
 ## Planned milestones
 
-1. Local development environment
-2. Google Cloud foundation
-3. Go service foundation
-4. Database integration
-5. Docker development environment
-6. Terraform infrastructure
-7. Integration testing
-8. GoCD pipeline
-9. Google Cloud deployment
+1. Local development environment — complete
+2. Google Cloud foundation — complete
+3. Go service foundation — complete
+4. SQLite database integration — complete
+5. PostgreSQL integration — complete
+6. Database configuration and CockroachDB compatibility — next
+7. Dockerize the Go API
+8. Terraform infrastructure
+9. Integration testing
+10. GoCD pipeline
+11. Google Cloud deployment

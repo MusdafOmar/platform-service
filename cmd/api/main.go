@@ -17,12 +17,17 @@ type healthResponse struct {
 }
 
 func main() {
+	databaseDriver := environmentOrDefault(
+		"DB_DRIVER",
+		"sqlite",
+	)
+
 	dataSourceName := environmentOrDefault(
 		"DB_DSN",
 		"platform-service.db",
 	)
 
-	db, err := database.Open("sqlite", dataSourceName)
+	db, err := database.Open(databaseDriver, dataSourceName)
 	if err != nil {
 		log.Fatalf("connect to database: %v", err)
 	}
@@ -50,7 +55,7 @@ func main() {
 
 	address := ":8080"
 
-	log.Printf("database connected: %s", dataSourceName)
+	log.Printf("database connected using driver: %s", databaseDriver)
 	log.Printf("platform-service is running on http://localhost%s", address)
 
 	if err := http.ListenAndServe(address, mux); err != nil {
