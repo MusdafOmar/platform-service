@@ -7,7 +7,11 @@ POSTGRES_COMPOSE := docker compose --env-file $(ENV_FILE) -f deployments/docker/
 COCKROACH_COMPOSE := docker compose -f deployments/docker/cockroach.compose.yaml
 COCKROACH_DSN := postgresql://root@localhost:26257/platform_service?sslmode=disable
 
+API_COMPOSE := docker compose -f deployments/docker/api.compose.yaml
+API_IMAGE := platform-service:local
+
 .PHONY: help fmt test run run-postgres run-cockroach build check clean \
+	docker-build api-up api-down api-status api-logs \
 	postgres-up postgres-down postgres-status \
 	cockroach-up cockroach-init cockroach-down cockroach-status
 
@@ -21,6 +25,11 @@ help:
 	@echo "  make build             - Build the API binary"
 	@echo "  make check             - Format and test the project"
 	@echo "  make clean             - Remove generated build files"
+	@echo "  make docker-build      - Build the API Docker image"
+	@echo "  make api-up            - Build and start the containerized API"
+	@echo "  make api-down          - Stop the containerized API"
+	@echo "  make api-status        - Show the containerized API status"
+	@echo "  make api-logs          - Follow the containerized API logs"
 	@echo "  make postgres-up       - Start PostgreSQL"
 	@echo "  make postgres-down     - Stop PostgreSQL"
 	@echo "  make postgres-status   - Show PostgreSQL status"
@@ -55,6 +64,21 @@ check: fmt test
 
 clean:
 	rm -rf bin
+
+docker-build:
+	docker build -t $(API_IMAGE) .
+
+api-up:
+	$(API_COMPOSE) up -d --build
+
+api-down:
+	$(API_COMPOSE) down
+
+api-status:
+	$(API_COMPOSE) ps
+
+api-logs:
+	$(API_COMPOSE) logs -f api
 
 postgres-up:
 	$(POSTGRES_COMPOSE) up -d

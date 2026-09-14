@@ -1,0 +1,28 @@
+name: platform-service-api
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: platform-service:local
+    container_name: platform-service-api
+    environment:
+      DB_DRIVER: sqlite
+      DB_DSN: /app/data/platform-service.db
+    ports:
+      - "8080:8080"
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -qO- http://localhost:8080/health >/dev/null || exit 1
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:

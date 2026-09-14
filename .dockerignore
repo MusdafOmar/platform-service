@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Editor settings
+.vscode
+.idea
+
+# Secrets
+.env
+.env.*
+
+# Build and test output
+bin
+coverage.out
+*.test
+
+# Local databases
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Terraform runtime files
+**/.terraform
+*.tfstate
+*.tfstate.*
+
+# Files unnecessary for compiling the API
+docs
+infrastructure
+deployments
+scripts
+tests
+README.md

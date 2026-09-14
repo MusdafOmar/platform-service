@@ -6,10 +6,10 @@ The project combines:
 
 - Go REST API
 - SQLite, PostgreSQL and CockroachDB
-- Docker Compose
+- Docker and Docker Compose
 - Terraform on Google Cloud
 - Makefile automation
-- Integration tests
+- Integration testing
 - GoCD continuous delivery
 
 ## Current status
@@ -23,9 +23,15 @@ The API currently provides:
 - PostgreSQL support through pgx
 - CockroachDB support through the PostgreSQL protocol
 - Automatic database migrations
-- Docker Compose for PostgreSQL and CockroachDB
+- Multi-stage Docker image for the Go API
+- Docker Compose for the API
+- Docker Compose for PostgreSQL
+- Docker Compose for CockroachDB
+- Persistent Docker volumes
+- Docker container health checks
 - Unit and HTTP handler tests
 - Makefile commands for local development
+- Google Cloud project foundation
 
 ## Requirements
 
@@ -36,7 +42,117 @@ The API currently provides:
 - Terraform
 - Google Cloud CLI
 
-## Run with SQLite
+## Run the API in Docker
+
+Build the API Docker image:
+
+```bash
+make docker-build
+```
+
+The image is created with this name:
+
+```text
+platform-service:local
+```
+
+Build and start the containerized API:
+
+```bash
+make api-up
+```
+
+Check the container status:
+
+```bash
+make api-status
+```
+
+The status should eventually show:
+
+```text
+healthy
+```
+
+Test the health endpoint:
+
+```bash
+curl http://localhost:8080/health
+```
+
+Expected response:
+
+```json
+{"status":"ok","service":"platform-service"}
+```
+
+Follow the API container logs:
+
+```bash
+make api-logs
+```
+
+Press `Control + C` to stop following the logs. This does not stop the container.
+
+Stop and remove the API container and its network:
+
+```bash
+make api-down
+```
+
+The named volume below preserves the SQLite database when the container is removed:
+
+```text
+platform-service-api_sqlite_data
+```
+
+Do not add `-v` to the Compose down command unless you intentionally want to delete the stored SQLite data.
+
+## Docker image design
+
+The `Dockerfile` uses a multi-stage build.
+
+The builder stage:
+
+1. Uses the Go Alpine image.
+2. Downloads the Go dependencies.
+3. Compiles the API into a Linux binary.
+4. Produces the `platform-service` executable.
+
+The runtime stage:
+
+1. Uses a smaller Alpine Linux image.
+2. Installs CA certificates.
+3. Creates a non-root application user.
+4. Copies only the compiled binary.
+5. Stores SQLite data under `/app/data`.
+6. Exposes port `8080`.
+
+The application runs as the non-root user:
+
+```text
+app
+```
+
+This reduces the privileges available inside the running container.
+
+## Docker build context
+
+The `.dockerignore` file prevents unnecessary or sensitive files from being sent to Docker during a build.
+
+Ignored files include:
+
+- Git history
+- Editor settings
+- Environment files
+- Local database files
+- Build output
+- Terraform state
+- Documentation and deployment files that are not required for compilation
+
+This keeps the build context smaller and prevents local secrets from entering the image.
+
+## Run with SQLite without Docker
 
 SQLite is the default database:
 
@@ -88,7 +204,7 @@ Stop the API with `Control + C`, then stop PostgreSQL:
 make postgres-down
 ```
 
-The named Docker volume preserves the PostgreSQL data when the container is stopped.
+The named Docker volume preserves PostgreSQL data when the container is stopped or removed.
 
 ## Run with CockroachDB
 
@@ -128,7 +244,9 @@ Stop the API with `Control + C`, then stop CockroachDB:
 make cockroach-down
 ```
 
-The named Docker volume preserves the CockroachDB data when the container is stopped.
+The named Docker volume preserves CockroachDB data when the container is stopped or removed.
+
+The local CockroachDB container uses insecure mode for development only. Production environments must use authentication and encrypted connections.
 
 ## Database configuration
 
@@ -139,20 +257,78 @@ DB_DRIVER
 DB_DSN
 ```
 
-Default SQLite configuration:
+### SQLite configuration
+
+Default local configuration:
 
 ```text
 DB_DRIVER=sqlite
 DB_DSN=platform-service.db
 ```
 
-PostgreSQL and CockroachDB both use the pgx driver:
+The Docker container uses:
+
+```text
+DB_DRIVER=sqlite
+DB_DSN=/app/data/platform-service.db
+```
+
+### PostgreSQL configuration
+
+PostgreSQL uses:
 
 ```text
 DB_DRIVER=pgx
 ```
 
-The DSN identifies the database server, port, user, database name and connection options.
+The PostgreSQL DSN contains:
+
+- Database username
+- Database password
+- Database host
+- Database port
+- Database name
+- SSL configuration
+
+### CockroachDB configuration
+
+CockroachDB also uses:
+
+```text
+DB_DRIVER=pgx
+```
+
+The local development DSN is:
+
+```text
+postgresql://root@localhost:26257/platform_service?sslmode=disable
+```
+
+CockroachDB can reuse pgx because it supports the PostgreSQL wire protocol.
+
+## Database migrations
+
+Database migrations are stored in:
+
+```text
+migrations/
+```
+
+The first migration creates the `services` table:
+
+```text
+migrations/001_create_services.sql
+```
+
+The Go application embeds the SQL migration files into the compiled binary.
+
+When the API starts, it automatically applies the migrations before starting the HTTP server.
+
+The same migration currently works with:
+
+- SQLite
+- PostgreSQL
+- CockroachDB
 
 ## API address
 
@@ -162,10 +338,18 @@ The API starts at:
 http://localhost:8080
 ```
 
-## Test the health endpoint
+## Health endpoint
+
+Request:
 
 ```bash
-curl http://localhost:8080/health
+curl -i http://localhost:8080/health
+```
+
+Expected status:
+
+```text
+HTTP/1.1 200 OK
 ```
 
 Expected response:
@@ -176,43 +360,93 @@ Expected response:
 
 ## Create a service
 
+Request:
+
 ```bash
-curl \
+curl -i \
   -X POST \
   -H "Content-Type: application/json" \
   -d '{"name":"catalog-api","description":"LIA platform service"}' \
   http://localhost:8080/services
 ```
 
-A successful request returns:
+Expected status:
 
 ```text
-201 Created
+HTTP/1.1 201 Created
 ```
+
+Example response:
+
+```json
+{
+  "id": "generated-uuid",
+  "name": "catalog-api",
+  "description": "LIA platform service",
+  "created_at": "generated-timestamp"
+}
+```
+
+The API:
+
+1. Validates the request.
+2. Generates a UUID.
+3. Creates a UTC timestamp.
+4. Inserts the service into the selected database.
+5. Returns the created record as JSON.
 
 ## List services
 
+Request:
+
 ```bash
-curl http://localhost:8080/services
+curl -i http://localhost:8080/services
 ```
 
-A successful request returns:
+Expected status:
 
 ```text
-200 OK
+HTTP/1.1 200 OK
+```
+
+Example response:
+
+```json
+{
+  "services": [
+    {
+      "id": "generated-uuid",
+      "name": "catalog-api",
+      "description": "LIA platform service",
+      "created_at": "generated-timestamp"
+    }
+  ]
+}
 ```
 
 ## Run tests
+
+Run all Go tests:
 
 ```bash
 make test
 ```
 
-Or format the code and run all tests:
+Format the Go code and run every test:
 
 ```bash
 make check
 ```
+
+The test suite covers:
+
+- Health endpoint
+- Create-service handler
+- List-services handler
+- SQLite database connection
+- Service repository
+- Service listing
+- Database migrations
 
 ## Available Make commands
 
@@ -226,6 +460,11 @@ make run-cockroach
 make build
 make check
 make clean
+make docker-build
+make api-up
+make api-down
+make api-status
+make api-logs
 make postgres-up
 make postgres-down
 make postgres-status
@@ -234,6 +473,45 @@ make cockroach-init
 make cockroach-down
 make cockroach-status
 ```
+
+### Application commands
+
+| Command | Purpose |
+|---|---|
+| `make run` | Run the API locally with SQLite |
+| `make run-postgres` | Run the API locally with PostgreSQL |
+| `make run-cockroach` | Run the API locally with CockroachDB |
+| `make build` | Compile the Go API |
+| `make test` | Run all Go tests |
+| `make check` | Format the code and run all tests |
+| `make clean` | Remove generated build files |
+
+### API Docker commands
+
+| Command | Purpose |
+|---|---|
+| `make docker-build` | Build the API Docker image |
+| `make api-up` | Build and start the containerized API |
+| `make api-down` | Stop and remove the API container |
+| `make api-status` | Show the API container status |
+| `make api-logs` | Follow the API container logs |
+
+### PostgreSQL commands
+
+| Command | Purpose |
+|---|---|
+| `make postgres-up` | Start PostgreSQL |
+| `make postgres-down` | Stop PostgreSQL |
+| `make postgres-status` | Show PostgreSQL status |
+
+### CockroachDB commands
+
+| Command | Purpose |
+|---|---|
+| `make cockroach-up` | Start CockroachDB |
+| `make cockroach-init` | Create the application database |
+| `make cockroach-down` | Stop CockroachDB |
+| `make cockroach-status` | Show CockroachDB status |
 
 ## Project structure
 
@@ -250,6 +528,7 @@ platform-service/
 ├── deployments/
 │   ├── docker/
 │   │   ├── .env.example
+│   │   ├── api.compose.yaml
 │   │   ├── compose.yaml
 │   │   └── cockroach.compose.yaml
 │   └── gocd/
@@ -274,7 +553,9 @@ platform-service/
 ├── scripts/
 ├── tests/
 │   └── integration/
+├── .dockerignore
 ├── .gitignore
+├── Dockerfile
 ├── go.mod
 ├── go.sum
 ├── Makefile
@@ -295,6 +576,48 @@ This parameter style works with:
 - PostgreSQL
 - CockroachDB
 
+This allows the same repository implementation to support all three databases.
+
+## Docker persistence
+
+There are three database-storage scenarios in the project:
+
+| Environment | Storage |
+|---|---|
+| Local SQLite | `platform-service.db` |
+| Dockerized SQLite | `platform-service-api_sqlite_data` volume |
+| PostgreSQL | `docker_postgres_data` volume |
+| CockroachDB | `docker_cockroach_data` volume |
+
+A container can be removed and recreated while its named volume remains available.
+
+Running Compose down normally preserves the volume:
+
+```bash
+make api-down
+```
+
+Deleting the volume is destructive and removes its stored database data.
+
+## Google Cloud foundation
+
+The Google Cloud project is:
+
+```text
+lia-platform-musdaf-2026
+```
+
+The following foundation work is complete:
+
+- Google Cloud CLI authentication
+- Application Default Credentials
+- Billing enabled
+- Monthly budget configured
+- Budget thresholds configured
+- Required Google Cloud APIs enabled
+
+Terraform will manage the project infrastructure in the next milestone.
+
 ## Planned milestones
 
 1. Local development environment — complete
@@ -303,8 +626,8 @@ This parameter style works with:
 4. SQLite database integration — complete
 5. PostgreSQL integration — complete
 6. Database configuration and CockroachDB compatibility — complete
-7. Dockerize the Go API — next
-8. Terraform infrastructure
+7. Dockerize the Go API — complete
+8. Terraform infrastructure — next
 9. Integration testing
 10. GoCD pipeline
 11. Google Cloud deployment
