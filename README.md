@@ -23,15 +23,23 @@ The API currently provides:
 - PostgreSQL support through pgx
 - CockroachDB support through the PostgreSQL protocol
 - Automatic database migrations
-- Multi-stage Docker image for the Go API
-- Docker Compose for the API
-- Docker Compose for PostgreSQL
-- Docker Compose for CockroachDB
-- Persistent Docker volumes
-- Docker container health checks
 - Unit and HTTP handler tests
-- Makefile commands for local development
-- Google Cloud project foundation
+
+The platform currently provides:
+
+- Multi-stage Docker image for the Go API
+- Docker Compose for the API, PostgreSQL and CockroachDB
+- Persistent local Docker volumes
+- Docker container health checks
+- Makefile automation for Go, Docker and Terraform
+- Terraform-managed Google Cloud infrastructure
+- Protected GCS remote Terraform state
+- Artifact Registry Docker repository
+- Versioned `linux/amd64` cloud container image
+- Dedicated Cloud Run service account
+- Private Cloud Run deployment
+- Scale-to-zero with a maximum of one instance
+- 100 SEK monthly GCP budget with alert thresholds
 
 ## Requirements
 
@@ -612,11 +620,177 @@ The following foundation work is complete:
 - Google Cloud CLI authentication
 - Application Default Credentials
 - Billing enabled
-- Monthly budget configured
-- Budget thresholds configured
+- Monthly budget of 100 SEK configured
+- Budget thresholds at 25%, 50%, 90% and 100%
 - Required Google Cloud APIs enabled
+- Regional resources configured in `europe-north1`
 
-Terraform will manage the project infrastructure in the next milestone.
+## Terraform infrastructure
+
+Terraform manages the Google Cloud infrastructure under:
+
+```text
+infrastructure/terraform/
+```
+
+The configuration currently manages:
+
+- Required Google Cloud APIs
+- Artifact Registry Docker repository
+- Dedicated Cloud Run service account
+- Private Cloud Run service
+- Protected GCS bucket for remote Terraform state
+- Terraform outputs for repository and service information
+
+Initialize Terraform:
+
+```bash
+make terraform-init
+```
+
+Format and validate the configuration:
+
+```bash
+make terraform-check
+```
+
+Preview infrastructure changes:
+
+```bash
+make terraform-plan
+```
+
+Apply reviewed infrastructure changes:
+
+```bash
+make terraform-apply
+```
+
+Display Terraform outputs:
+
+```bash
+make terraform-output
+```
+
+Terraform state is stored remotely in:
+
+```text
+gs://lia-platform-musdaf-2026-terraform-state/platform-service/development/
+```
+
+The state bucket uses:
+
+- Object versioning
+- Uniform bucket-level access
+- Public access prevention
+- Terraform destroy protection
+
+Private values belong in:
+
+```text
+infrastructure/terraform/terraform.tfvars
+```
+
+This file is ignored by Git. Use the tracked example as a template:
+
+```text
+infrastructure/terraform/terraform.tfvars.example
+```
+
+## Artifact Registry
+
+The Docker repository is:
+
+```text
+europe-north1-docker.pkg.dev/lia-platform-musdaf-2026/platform-service
+```
+
+Authenticate Docker:
+
+```bash
+make artifact-auth
+```
+
+Build a Cloud Run-compatible `linux/amd64` image and push it:
+
+```bash
+make cloud-image-push
+```
+
+The default image is:
+
+```text
+europe-north1-docker.pkg.dev/lia-platform-musdaf-2026/platform-service/platform-service:v0.1.0
+```
+
+A different version can be pushed with:
+
+```bash
+make cloud-image-push CLOUD_IMAGE_TAG=v0.1.1
+```
+
+## Cloud Run deployment
+
+The Terraform-managed Cloud Run service is:
+
+```text
+platform-service
+```
+
+It uses:
+
+- A dedicated service account
+- Authenticated access
+- Scale-to-zero
+- Maximum one running instance
+- One vCPU
+- 512 MiB memory
+- Container port 8080
+- Image version `v0.1.0`
+
+Display the service URL:
+
+```bash
+terraform -chdir=infrastructure/terraform \
+  output -raw cloud_run_service_url
+```
+
+Store the URL temporarily:
+
+```bash
+LIA_SERVICE_URL="$(
+  terraform -chdir=infrastructure/terraform \
+  output -raw cloud_run_service_url
+)"
+```
+
+Test the authenticated health endpoint:
+
+```bash
+curl \
+  -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  "$LIA_SERVICE_URL/health"
+```
+
+Expected response:
+
+```json
+{"status":"ok","service":"platform-service"}
+```
+
+Anonymous requests return `403 Forbidden` because the service is private.
+
+## Cloud database limitation
+
+The initial Cloud Run deployment uses SQLite at:
+
+```text
+/tmp/platform-service.db
+```
+
+Cloud Run container filesystems are ephemeral. Records can disappear when the instance restarts or scales down.
+
+SQLite in Cloud Run is therefore used only to verify that the deployed container works. A durable cloud deployment requires an external database such as PostgreSQL.
 
 ## Planned milestones
 
@@ -627,7 +801,7 @@ Terraform will manage the project infrastructure in the next milestone.
 5. PostgreSQL integration — complete
 6. Database configuration and CockroachDB compatibility — complete
 7. Dockerize the Go API — complete
-8. Terraform infrastructure — next
-9. Integration testing
-10. GoCD pipeline
-11. Google Cloud deployment
+8. Terraform infrastructure — complete
+9. Integration testing — next
+10. GoCD pipeline — planned
+11. Google Cloud deployment — initial Cloud Run deployment complete

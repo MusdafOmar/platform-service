@@ -10,33 +10,55 @@ COCKROACH_DSN := postgresql://root@localhost:26257/platform_service?sslmode=disa
 API_COMPOSE := docker compose -f deployments/docker/api.compose.yaml
 API_IMAGE := platform-service:local
 
+TERRAFORM_DIR := infrastructure/terraform
+TERRAFORM := terraform -chdir=$(TERRAFORM_DIR)
+
+GCP_PROJECT := lia-platform-musdaf-2026
+GCP_REGION := europe-north1
+ARTIFACT_REPOSITORY := platform-service
+CLOUD_IMAGE_NAME := platform-service
+CLOUD_IMAGE_TAG ?= v0.1.0
+CLOUD_IMAGE := $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(ARTIFACT_REPOSITORY)/$(CLOUD_IMAGE_NAME):$(CLOUD_IMAGE_TAG)
+
 .PHONY: help fmt test run run-postgres run-cockroach build check clean \
 	docker-build api-up api-down api-status api-logs \
 	postgres-up postgres-down postgres-status \
-	cockroach-up cockroach-init cockroach-down cockroach-status
+	cockroach-up cockroach-init cockroach-down cockroach-status \
+	terraform-fmt terraform-init terraform-validate terraform-plan \
+	terraform-apply terraform-output terraform-check \
+	artifact-auth cloud-image-push
 
 help:
 	@echo "Available commands:"
-	@echo "  make fmt               - Format all Go code"
-	@echo "  make test              - Run all tests"
-	@echo "  make run               - Run the API with SQLite"
-	@echo "  make run-postgres      - Run the API with PostgreSQL"
-	@echo "  make run-cockroach     - Run the API with CockroachDB"
-	@echo "  make build             - Build the API binary"
-	@echo "  make check             - Format and test the project"
-	@echo "  make clean             - Remove generated build files"
-	@echo "  make docker-build      - Build the API Docker image"
-	@echo "  make api-up            - Build and start the containerized API"
-	@echo "  make api-down          - Stop the containerized API"
-	@echo "  make api-status        - Show the containerized API status"
-	@echo "  make api-logs          - Follow the containerized API logs"
-	@echo "  make postgres-up       - Start PostgreSQL"
-	@echo "  make postgres-down     - Stop PostgreSQL"
-	@echo "  make postgres-status   - Show PostgreSQL status"
-	@echo "  make cockroach-up      - Start CockroachDB"
-	@echo "  make cockroach-init    - Create the CockroachDB database"
-	@echo "  make cockroach-down    - Stop CockroachDB"
-	@echo "  make cockroach-status  - Show CockroachDB status"
+	@echo "  make fmt                - Format all Go code"
+	@echo "  make test               - Run all Go tests"
+	@echo "  make run                - Run the API with SQLite"
+	@echo "  make run-postgres       - Run the API with PostgreSQL"
+	@echo "  make run-cockroach      - Run the API with CockroachDB"
+	@echo "  make build              - Build the API binary"
+	@echo "  make check              - Format and test the Go project"
+	@echo "  make clean              - Remove generated build files"
+	@echo "  make docker-build       - Build the local API Docker image"
+	@echo "  make api-up             - Build and start the containerized API"
+	@echo "  make api-down           - Stop the containerized API"
+	@echo "  make api-status         - Show the containerized API status"
+	@echo "  make api-logs           - Follow the containerized API logs"
+	@echo "  make postgres-up        - Start PostgreSQL"
+	@echo "  make postgres-down      - Stop PostgreSQL"
+	@echo "  make postgres-status    - Show PostgreSQL status"
+	@echo "  make cockroach-up       - Start CockroachDB"
+	@echo "  make cockroach-init     - Create the CockroachDB database"
+	@echo "  make cockroach-down     - Stop CockroachDB"
+	@echo "  make cockroach-status   - Show CockroachDB status"
+	@echo "  make terraform-fmt      - Format Terraform configuration"
+	@echo "  make terraform-init     - Initialize Terraform and its backend"
+	@echo "  make terraform-validate - Validate Terraform configuration"
+	@echo "  make terraform-plan     - Preview Terraform infrastructure changes"
+	@echo "  make terraform-apply    - Review and apply Terraform changes"
+	@echo "  make terraform-output   - Display Terraform outputs"
+	@echo "  make terraform-check    - Format and validate Terraform"
+	@echo "  make artifact-auth      - Authenticate Docker to Artifact Registry"
+	@echo "  make cloud-image-push   - Build and push the amd64 cloud image"
 
 fmt:
 	$(GO) fmt ./...
@@ -103,3 +125,33 @@ cockroach-down:
 
 cockroach-status:
 	$(COCKROACH_COMPOSE) ps
+
+terraform-fmt:
+	$(TERRAFORM) fmt -recursive
+
+terraform-init:
+	$(TERRAFORM) init
+
+terraform-validate:
+	$(TERRAFORM) validate
+
+terraform-plan:
+	$(TERRAFORM) plan
+
+terraform-apply:
+	$(TERRAFORM) apply
+
+terraform-output:
+	$(TERRAFORM) output
+
+terraform-check: terraform-fmt terraform-validate
+
+artifact-auth:
+	gcloud auth configure-docker $(GCP_REGION)-docker.pkg.dev
+
+cloud-image-push:
+	docker buildx build \
+		--platform linux/amd64 \
+		--tag $(CLOUD_IMAGE) \
+		--push \
+		.
