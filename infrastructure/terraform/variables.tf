@@ -20,3 +20,8 @@ variable "service_name" {
   type        = string
   default     = "platform-service"
 }
+variable "container_image_tag" {
+  description = "Container image version deployed to Cloud Run"
+  type        = string
+  default     = "v0.1.0"
+}

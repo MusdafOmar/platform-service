@@ -22,3 +22,12 @@ output "artifact_registry_repository_url" {
     google_artifact_registry_repository.platform_service.repository_id,
   )
 }
+output "cloud_run_service_name" {
+  description = "Name of the Cloud Run service"
+  value       = google_cloud_run_v2_service.platform_service.name
+}
+
+output "cloud_run_service_url" {
+  description = "Authenticated URL of the Cloud Run service"
+  value       = google_cloud_run_v2_service.platform_service.uri
+}
