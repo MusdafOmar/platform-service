@@ -53,7 +53,8 @@ func main() {
 		listServicesHandler(serviceRepository),
 	)
 
-	address := ":8080"
+	port := environmentOrDefault("PORT", "8080")
+	address := ":" + port
 
 	log.Printf("database connected using driver: %s", databaseDriver)
 	log.Printf("platform-service is running on http://localhost%s", address)

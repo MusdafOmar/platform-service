@@ -26,12 +26,13 @@ CLOUD_IMAGE := $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(ARTIFACT_REPOSITORY
 	cockroach-up cockroach-init cockroach-down cockroach-status \
 	terraform-fmt terraform-init terraform-validate terraform-plan \
 	terraform-apply terraform-output terraform-check \
-	artifact-auth cloud-image-push
+	artifact-auth cloud-image-push integration-test
 
 help:
 	@echo "Available commands:"
 	@echo "  make fmt                - Format all Go code"
 	@echo "  make test               - Run all Go tests"
+	@echo "  make integration-test   - Run API integration tests"
 	@echo "  make run                - Run the API with SQLite"
 	@echo "  make run-postgres       - Run the API with PostgreSQL"
 	@echo "  make run-cockroach      - Run the API with CockroachDB"
@@ -65,6 +66,9 @@ fmt:
 
 test:
 	$(GO) test ./...
+
+integration-test:
+	$(GO) test -count=1 -tags=integration ./tests/integration -v
 
 run:
 	$(GO) run ./cmd/api

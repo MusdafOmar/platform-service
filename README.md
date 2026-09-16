@@ -434,19 +434,36 @@ Example response:
 
 ## Run tests
 
-Run all Go tests:
+Run the unit and handler tests:
 
 ```bash
 make test
 ```
 
-Format the Go code and run every test:
+Format the Go code and run the unit and handler tests:
 
 ```bash
 make check
 ```
 
-The test suite covers:
+Run the black-box API integration test:
+
+```bash
+make integration-test
+```
+
+The integration test performs a fresh run every time. It:
+
+- Builds the real API binary
+- Creates a temporary SQLite database
+- Selects an available local port
+- Starts the API as a separate process
+- Waits for `GET /health` to return successfully
+- Creates a service with `POST /services`
+- Retrieves the service with `GET /services`
+- Stops the API and removes temporary test files automatically
+
+The complete test coverage includes:
 
 - Health endpoint
 - Create-service handler
@@ -455,6 +472,7 @@ The test suite covers:
 - Service repository
 - Service listing
 - Database migrations
+- Full API service lifecycle
 
 ## Available Make commands
 
@@ -462,6 +480,7 @@ The test suite covers:
 make help
 make fmt
 make test
+make integration-test
 make run
 make run-postgres
 make run-cockroach
@@ -490,7 +509,8 @@ make cockroach-status
 | `make run-postgres` | Run the API locally with PostgreSQL |
 | `make run-cockroach` | Run the API locally with CockroachDB |
 | `make build` | Compile the Go API |
-| `make test` | Run all Go tests |
+| `make test` | Run unit and handler tests |
+| `make integration-test` | Build and test the complete API lifecycle |
 | `make check` | Format the code and run all tests |
 | `make clean` | Remove generated build files |
 
@@ -802,6 +822,6 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 6. Database configuration and CockroachDB compatibility — complete
 7. Dockerize the Go API — complete
 8. Terraform infrastructure — complete
-9. Integration testing — next
-10. GoCD pipeline — planned
+9. Integration testing — complete
+10. GoCD pipeline — next
 11. Google Cloud deployment — initial Cloud Run deployment complete
