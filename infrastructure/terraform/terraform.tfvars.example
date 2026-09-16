@@ -1,0 +1,4 @@
+project_id                   = "lia-platform-musdaf-2026"
+region                       = "europe-north1"
+artifact_registry_repository = "platform-service"
+service_name                 = "platform-service"
