@@ -893,5 +893,5 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 7. Dockerize the Go API — complete
 8. Terraform infrastructure — complete
 9. Integration testing — complete
-10. 10. GoCD pipeline — in progress
+10. GoCD pipeline — complete
 11. Google Cloud deployment — initial Cloud Run deployment complete
