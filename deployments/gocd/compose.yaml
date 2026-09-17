@@ -1,0 +1,35 @@
+services:
+  server:
+    image: gocd/gocd-server:v26.1.0
+    container_name: platform-service-gocd-server
+    restart: unless-stopped
+    ports:
+      - "8153:8153"
+    volumes:
+      - gocd_server_data:/godata
+      - gocd_server_home:/home/go
+
+  agent:
+    build:
+      context: ../..
+      dockerfile: deployments/gocd/agent.Dockerfile
+    image: platform-service-gocd-agent:local
+    container_name: platform-service-gocd-agent
+    hostname: platform-service-agent
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      GO_SERVER_URL: http://server:8153/go
+    group_add:
+      - "0"
+    volumes:
+      - gocd_agent_data:/godata
+      - gocd_agent_home:/home/go
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  gocd_server_data:
+  gocd_server_home:
+  gocd_agent_data:
+  gocd_agent_home:

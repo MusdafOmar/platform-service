@@ -31,7 +31,12 @@ The platform currently provides:
 - Docker Compose for the API, PostgreSQL and CockroachDB
 - Persistent local Docker volumes
 - Docker container health checks
-- Makefile automation for Go, Docker and Terraform
+- Local GoCD server and custom GoCD build agent
+- GoCD agent with Go, Git, Make and Docker CLI
+- Parallel unit and integration-test jobs
+- Docker image build stage after successful verification
+- Automatic pipeline scheduling for changes on `main`
+- Makefile automation for Go, Docker, Terraform and GoCD
 - Terraform-managed Google Cloud infrastructure
 - Protected GCS remote Terraform state
 - Artifact Registry Docker repository
@@ -474,6 +479,59 @@ The complete test coverage includes:
 - Database migrations
 - Full API service lifecycle
 
+## Run GoCD locally
+
+Build and start the GoCD server and custom build agent:
+
+```bash
+make gocd-up
+```
+
+Open the GoCD interface:
+
+```text
+http://localhost:8153/go
+```
+
+Check the container status:
+
+```bash
+make gocd-status
+```
+
+Follow the GoCD logs:
+
+```bash
+make gocd-logs
+```
+
+The pipeline contains two stages:
+
+```text
+verify
+├── unit-tests
+└── integration-tests
+
+build
+└── docker-build
+```
+
+The verification jobs run independently. When both pass, GoCD automatically starts the build stage and creates the local image:
+
+```text
+platform-service:local
+```
+
+Changes pushed to the `main` branch automatically schedule the pipeline.
+
+Stop GoCD:
+
+```bash
+make gocd-down
+```
+
+The named Docker volumes preserve the GoCD server configuration and agent data.
+
 ## Available Make commands
 
 ```bash
@@ -499,6 +557,10 @@ make cockroach-up
 make cockroach-init
 make cockroach-down
 make cockroach-status
+make gocd-up
+make gocd-down
+make gocd-status
+make gocd-logs
 ```
 
 ### Application commands
@@ -541,9 +603,15 @@ make cockroach-status
 | `make cockroach-down` | Stop CockroachDB |
 | `make cockroach-status` | Show CockroachDB status |
 
-## Project structure
+### GoCD commands
 
-```text
+| Command | Purpose |
+|---|---|
+| `make gocd-up` | Build and start the GoCD server and agent |
+| `make gocd-down` | Stop and remove the GoCD containers |
+| `make gocd-status` | Show the GoCD container status |
+| `make gocd-logs` | Follow the GoCD logs |
+
 platform-service/
 ├── cmd/
 │   └── api/
@@ -560,6 +628,8 @@ platform-service/
 │   │   ├── compose.yaml
 │   │   └── cockroach.compose.yaml
 │   └── gocd/
+│       ├── agent.Dockerfile
+│       └── compose.yaml
 ├── docs/
 ├── infrastructure/
 │   └── terraform/
@@ -581,6 +651,7 @@ platform-service/
 ├── scripts/
 ├── tests/
 │   └── integration/
+│       └── api_test.go
 ├── .dockerignore
 ├── .gitignore
 ├── Dockerfile
@@ -588,7 +659,6 @@ platform-service/
 ├── go.sum
 ├── Makefile
 └── README.md
-```
 
 ## Database compatibility
 
@@ -823,5 +893,5 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 7. Dockerize the Go API — complete
 8. Terraform infrastructure — complete
 9. Integration testing — complete
-10. GoCD pipeline — next
+10. 10. GoCD pipeline — in progress
 11. Google Cloud deployment — initial Cloud Run deployment complete

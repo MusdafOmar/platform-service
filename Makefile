@@ -9,7 +9,7 @@ COCKROACH_DSN := postgresql://root@localhost:26257/platform_service?sslmode=disa
 
 API_COMPOSE := docker compose -f deployments/docker/api.compose.yaml
 API_IMAGE := platform-service:local
-
+GOCD_COMPOSE := docker compose -f deployments/gocd/compose.yaml
 TERRAFORM_DIR := infrastructure/terraform
 TERRAFORM := terraform -chdir=$(TERRAFORM_DIR)
 
@@ -26,7 +26,8 @@ CLOUD_IMAGE := $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(ARTIFACT_REPOSITORY
 	cockroach-up cockroach-init cockroach-down cockroach-status \
 	terraform-fmt terraform-init terraform-validate terraform-plan \
 	terraform-apply terraform-output terraform-check \
-	artifact-auth cloud-image-push integration-test
+	artifact-auth cloud-image-push integration-test \
+	gocd-up gocd-down gocd-status gocd-logs
 
 help:
 	@echo "Available commands:"
@@ -60,6 +61,10 @@ help:
 	@echo "  make terraform-check    - Format and validate Terraform"
 	@echo "  make artifact-auth      - Authenticate Docker to Artifact Registry"
 	@echo "  make cloud-image-push   - Build and push the amd64 cloud image"
+	@echo "  make gocd-up            - Build and start GoCD"
+	@echo "  make gocd-down          - Stop GoCD"
+	@echo "  make gocd-status        - Show GoCD container status"
+	@echo "  make gocd-logs          - Follow GoCD logs"
 
 fmt:
 	$(GO) fmt ./...
@@ -159,3 +164,15 @@ cloud-image-push:
 		--tag $(CLOUD_IMAGE) \
 		--push \
 		.
+
+gocd-up:
+	$(GOCD_COMPOSE) up -d --build
+
+gocd-down:
+	$(GOCD_COMPOSE) down
+
+gocd-status:
+	$(GOCD_COMPOSE) ps
+
+gocd-logs:
+	$(GOCD_COMPOSE) logs -f
