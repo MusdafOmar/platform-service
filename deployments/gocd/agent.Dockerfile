@@ -10,6 +10,7 @@ ENV PATH="/usr/local/go/bin:${PATH}"
 
 RUN apk add --no-cache \
     docker-cli \
-    make
+    make \
+    trivy
 
 USER go

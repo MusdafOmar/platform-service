@@ -9,6 +9,8 @@ COCKROACH_DSN := postgresql://root@localhost:26257/platform_service?sslmode=disa
 
 API_COMPOSE := docker compose -f deployments/docker/api.compose.yaml
 API_IMAGE := platform-service:local
+TRIVY ?= trivy
+TRIVY_SEVERITY ?= HIGH,CRITICAL
 GOCD_COMPOSE := docker compose -f deployments/gocd/compose.yaml
 TERRAFORM_DIR := infrastructure/terraform
 TERRAFORM := terraform -chdir=$(TERRAFORM_DIR)
@@ -27,7 +29,8 @@ CLOUD_IMAGE := $(GCP_REGION)-docker.pkg.dev/$(GCP_PROJECT)/$(ARTIFACT_REPOSITORY
 	terraform-fmt terraform-init terraform-validate terraform-plan \
 	terraform-apply terraform-output terraform-check \
 	artifact-auth cloud-image-push integration-test \
-	gocd-up gocd-down gocd-status gocd-logs
+	gocd-up gocd-down gocd-status gocd-logs \
+	security-scan security-image-scan
 
 help:
 	@echo "Available commands:"
@@ -65,6 +68,8 @@ help:
 	@echo "  make gocd-down          - Stop GoCD"
 	@echo "  make gocd-status        - Show GoCD container status"
 	@echo "  make gocd-logs          - Follow GoCD logs"
+	@echo "  make security-scan       - Scan source, dependencies, secrets and configuration"
+	@echo "  make security-image-scan - Build and scan the local API Docker image"
 
 fmt:
 	$(GO) fmt ./...
@@ -97,7 +102,7 @@ clean:
 	rm -rf bin
 
 docker-build:
-	docker build -t $(API_IMAGE) .
+	docker build --pull -t $(API_IMAGE) .
 
 api-up:
 	$(API_COMPOSE) up -d --build
@@ -176,3 +181,15 @@ gocd-status:
 
 gocd-logs:
 	$(GOCD_COMPOSE) logs -f
+security-scan:
+	$(TRIVY) fs \
+		--scanners vuln,misconfig,secret \
+		--severity $(TRIVY_SEVERITY) \
+		--exit-code 1 \
+		.
+
+security-image-scan: docker-build
+	$(TRIVY) image \
+		--severity $(TRIVY_SEVERITY) \
+		--exit-code 1 \
+		$(API_IMAGE)
