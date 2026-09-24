@@ -32,9 +32,10 @@ The platform currently provides:
 - Persistent local Docker volumes
 - Docker container health checks
 - Local GoCD server and custom GoCD build agent
-- GoCD agent with Go, Git, Make and Docker CLI
-- Parallel unit and integration-test jobs
-- Docker image build stage after successful verification
+- GoCD agent with Go, Git, Make, Docker CLI and Trivy
+- Parallel unit, integration-test and security-scan jobs
+- Docker image build and security scan after successful verification
+- Pipeline security gates for HIGH and CRITICAL findings
 - Automatic pipeline scheduling for changes on `main`
 - Makefile automation for Go, Docker, Terraform and GoCD
 - Terraform-managed Google Cloud infrastructure
@@ -52,6 +53,7 @@ The platform currently provides:
 - GNU Make
 - Git
 - Docker Desktop
+- Trivy
 - Terraform
 - Google Cloud CLI
 
@@ -510,18 +512,19 @@ The pipeline contains two stages:
 ```text
 verify
 ├── unit-tests
-└── integration-tests
+├── integration-tests
+└── security-scan
 
 build
 └── docker-build
+    └── security-image-scan
 ```
 
-The verification jobs run independently. When both pass, GoCD automatically starts the build stage and creates the local image:
+The three verification jobs run independently. The security job scans the source code, Go dependencies, configuration and secrets with Trivy.
 
-```text
-platform-service:local
-```
+When all verification jobs pass, GoCD starts the build stage. It builds `platform-service:local` and scans the resulting Docker image. HIGH or CRITICAL security findings fail the relevant job.
 
+Changes pushed to the `main` branch automatically schedule the pipeline.
 Changes pushed to the `main` branch automatically schedule the pipeline.
 
 Stop GoCD:
@@ -561,6 +564,8 @@ make gocd-up
 make gocd-down
 make gocd-status
 make gocd-logs
+make security-scan
+make security-image-scan
 ```
 
 ### Application commands
@@ -612,6 +617,16 @@ make gocd-logs
 | `make gocd-status` | Show the GoCD container status |
 | `make gocd-logs` | Follow the GoCD logs |
 
+### Security commands
+
+| Command | Purpose |
+|---|---|
+| `make security-scan` | Scan source code, dependencies, configuration and secrets |
+| `make security-image-scan` | Build and scan the local API Docker image |
+
+## Project structure
+
+```text
 platform-service/
 ├── cmd/
 │   └── api/
@@ -894,4 +909,5 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 8. Terraform infrastructure — complete
 9. Integration testing — complete
 10. GoCD pipeline — complete
-11. Google Cloud deployment — initial Cloud Run deployment complete
+11. Trivy security scanning — complete
+12. Google Cloud deployment — initial Cloud Run deployment complete
