@@ -72,3 +72,27 @@ jobs:
 
       - name: Scan repository
         run: make security-scan
+
+
+  image-security:
+    name: Build and scan image
+    runs-on: ubuntu-latest
+    needs:
+      - unit-tests
+      - integration-tests
+      - security-scan
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build Docker image
+        run: make docker-build
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.74.0
+
+      - name: Scan Docker image
+        run: trivy image --severity HIGH,CRITICAL --exit-code 1 platform-service:local
