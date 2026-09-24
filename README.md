@@ -525,7 +525,6 @@ The three verification jobs run independently. The security job scans the source
 When all verification jobs pass, GoCD starts the build stage. It builds `platform-service:local` and scans the resulting Docker image. HIGH or CRITICAL security findings fail the relevant job.
 
 Changes pushed to the `main` branch automatically schedule the pipeline.
-Changes pushed to the `main` branch automatically schedule the pipeline.
 
 Stop GoCD:
 
@@ -674,6 +673,7 @@ platform-service/
 ├── go.sum
 ├── Makefile
 └── README.md
+```
 
 ## Database compatibility
 
