@@ -108,12 +108,11 @@ jobs:
       - name: Scan Docker image
         run: trivy image --severity HIGH,CRITICAL --exit-code 1 platform-service:local
 
-
       - name: Generate SBOM
         run: trivy image --format spdx-json --output platform-service.spdx.json platform-service:local
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: platform-service-sbom
           path: platform-service.spdx.json
