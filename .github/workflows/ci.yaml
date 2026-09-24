@@ -15,7 +15,7 @@ permissions:
 jobs:
   unit-tests:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out repository
@@ -41,7 +41,7 @@ jobs:
 
   integration-tests:
     name: Integration tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out repository
@@ -59,7 +59,7 @@ jobs:
 
   security-scan:
     name: Security scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out repository
@@ -87,7 +87,7 @@ jobs:
 
   image-security:
     name: Build and scan image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs:
       - unit-tests
       - integration-tests
