@@ -55,3 +55,20 @@ jobs:
 
       - name: Run integration tests
         run: make integration-test
+
+
+    security-scan:
+    name: Security scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@e07451d2e059ed86c2870430ea286b3a9e0bf241
+        with:
+          version: v0.74.0
+
+      - name: Scan repository
+        run: make security-scan
