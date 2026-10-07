@@ -11,6 +11,7 @@ The project combines:
 - Makefile automation
 - Integration testing
 - GoCD continuous delivery
+- GitHub Actions CI and software supply-chain security
 
 ## Current status
 
@@ -36,6 +37,12 @@ The platform currently provides:
 - Parallel unit, integration-test and security-scan jobs
 - Docker image build and security scan after successful verification
 - Pipeline security gates for HIGH and CRITICAL findings
+- GitHub Actions CI for pull requests and pushes to `main`
+- Go vulnerability analysis with `govulncheck`
+- SPDX JSON SBOM generation for the API Docker image
+- Keyless SBOM signing with Cosign and GitHub Actions OIDC
+- Signature verification against the expected workflow identity and issuer
+- SBOM and Sigstore signature bundle uploaded as a CI artifact
 - Automatic pipeline scheduling for changes on `main`
 - Makefile automation for Go, Docker, Terraform and GoCD
 - Terraform-managed Google Cloud infrastructure
@@ -56,6 +63,20 @@ The platform currently provides:
 - Trivy
 - Terraform
 - Google Cloud CLI
+
+Go and Make are required for local development. Docker is required for container workflows; Trivy is required for local security scans. Terraform and the Google Cloud CLI are needed only for cloud infrastructure work. CI installs its own Go, Trivy and Cosign tools.
+
+## Quick start
+
+```bash
+git clone https://github.com/MusdafOmar/platform-service.git
+cd platform-service
+make test
+make integration-test
+make run
+```
+
+In a second terminal, check `http://localhost:8080/health`. Stop the local API with `Control + C` before starting another API on the same port.
 
 ## Run the API in Docker
 
@@ -165,7 +186,7 @@ Ignored files include:
 - Terraform state
 - Documentation and deployment files that are not required for compilation
 
-This keeps the build context smaller and prevents local secrets from entering the image.
+This keeps the build context smaller and reduces accidental inclusion of local secrets. It is not a substitute for reviewing files and scanning for secrets.
 
 ## Run with SQLite without Docker
 
@@ -470,7 +491,7 @@ The integration test performs a fresh run every time. It:
 - Retrieves the service with `GET /services`
 - Stops the API and removes temporary test files automatically
 
-The complete test coverage includes:
+The test suite covers:
 
 - Health endpoint
 - Create-service handler
@@ -533,6 +554,43 @@ make gocd-down
 ```
 
 The named Docker volumes preserve the GoCD server configuration and agent data.
+
+## GitHub Actions CI
+
+The workflow is defined in [`.github/workflows/ci.yaml`](.github/workflows/ci.yaml). It runs on pull requests targeting `main`, pushes to `main`, and manual dispatch.
+
+| Job | Checks | Dependency |
+|---|---|---|
+| Unit tests | Go formatting and `make test` | None |
+| Integration tests | `make integration-test` | None |
+| Security scan | `govulncheck` and `make security-scan` | None |
+| Build and scan image | Docker build, Trivy image scan, SBOM generation, Cosign signing, signature verification and artifact upload | All three verification jobs must pass |
+
+The first three jobs are independent. The image job starts only after all three succeed. Jobs use `ubuntu-24.04` to avoid an automatic major Ubuntu-version change; the hosted runner still receives updates.
+
+Trivy scans Go dependencies, configuration and secrets in the repository, and scans the built image. HIGH or CRITICAL findings fail the relevant Trivy scan. `govulncheck` adds Go-specific vulnerability analysis. A clean scan means no findings were detected under the configured checks and current vulnerability database; it does not guarantee the application is vulnerability-free.
+
+### Signed SBOM artifact
+
+An SBOM (Software Bill of Materials) is an inventory of the components found in the built image. Trivy generates SPDX 2.3 JSON, and Cosign signs the file using GitHub Actions OIDC without a stored long-lived signing key.
+
+Before uploading, CI verifies the signature against:
+
+- The exact workflow identity derived from `github.workflow_ref`
+- The issuer `https://token.actions.githubusercontent.com`
+
+The successful verification log contains `Verified OK`.
+
+The `platform-service-sbom` artifact contains:
+
+| File | Purpose |
+|---|---|
+| `platform-service.spdx.json` | Component inventory for the built API image |
+| `platform-service.spdx.sigstore.json` | Signature bundle and verification metadata |
+
+To download it, open the repository's **Actions** tab, select a successful run, and download `platform-service-sbom` from **Artifacts**. Extract the download and open the JSON files with VS Code. Artifacts are configured for 30-day retention.
+
+This signs the SBOM file, not the Docker image. A valid signature establishes file integrity and signer identity; it does not prove that the inventory is complete or that the software is safe.
 
 ## Available Make commands
 
@@ -627,6 +685,9 @@ make security-image-scan
 
 ```text
 platform-service/
+├── .github/
+│   └── workflows/
+│       └── ci.yaml
 ├── cmd/
 │   └── api/
 │       ├── main.go
@@ -693,7 +754,7 @@ This allows the same repository implementation to support all three databases.
 
 ## Docker persistence
 
-There are three database-storage scenarios in the project:
+Database storage differs by environment:
 
 | Environment | Storage |
 |---|---|
@@ -713,6 +774,8 @@ make api-down
 Deleting the volume is destructive and removes its stored database data.
 
 ## Google Cloud foundation
+
+The cloud sections describe the initial deployment and configured infrastructure. Current billing and live-service availability have not been revalidated for the final handoff. A GitHub push or successful CI run does not automatically deploy to GCP. Confirm billing and review a Terraform plan before applying changes or pushing cloud images.
 
 The Google Cloud project is:
 
@@ -911,3 +974,29 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 10. GoCD pipeline — complete
 11. Trivy security scanning — complete
 12. Google Cloud deployment — initial Cloud Run deployment complete
+13. GitHub Actions and signed SBOM — implementation verified; documentation updated
+14. Final validation, demonstration and handoff — pending
+
+## Security boundaries and limitations
+
+- Local development does not establish production readiness or application-level authentication. Cloud Run's authenticated access protects the cloud service at the platform boundary.
+- Local CockroachDB uses insecure mode. Production database connections require appropriate authentication and TLS.
+- The automated lifecycle integration test uses SQLite. This is not an automated PostgreSQL or CockroachDB integration-test matrix.
+- Cloud Run SQLite is ephemeral, and the current CI does not deploy to GCP.
+- GoCD pipeline settings configured through the local server must be preserved or recreated; the Compose setup alone is not proof that the pipeline is reproducible from a fresh clone.
+- Repository scans can have incomplete Terraform evaluation when variables such as `project_id` are not supplied.
+- Secrets, private `.env` files and Terraform state must not be committed. Budget alerts are notifications, not a spending cap.
+- SBOM signing is implemented; Docker-image signing, durable cloud storage, automated deployment and further CI hardening remain future improvements.
+
+## Final validation and demonstration
+
+Before marking milestone 14 complete:
+
+1. Clone the repository into a new directory and follow the quick-start instructions.
+2. Run `make test`, `make integration-test`, `make security-scan` and `make security-image-scan` with the required tools available.
+3. Start the Docker API with `make api-up`, confirm its health, and demonstrate creating and listing a service. Stop it with `make api-down`.
+4. Check the latest complete GitHub Actions run: all four jobs must pass, signature verification must report `Verified OK`, and the artifact must contain both JSON files.
+5. Record cloud availability separately; do not present the historical deployment as currently live without checking it.
+6. Review the README on GitHub, capture demonstration evidence and confirm `git status --short` is empty after committing and pushing.
+
+For a short demonstration, show the API lifecycle, the three independent verification jobs, the dependent image job, the signed artifact and the signature-verification log. Explain one remediated dependency vulnerability and the ephemeral-cloud-storage limitation.
