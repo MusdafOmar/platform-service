@@ -118,6 +118,15 @@ jobs:
       - name: Sign SBOM
         run: cosign sign-blob platform-service.spdx.json --bundle platform-service.spdx.sigstore.json --yes
 
+      - name: Verify SBOM signature
+        env:
+          EXPECTED_IDENTITY: https://github.com/${{ github.workflow_ref }}
+        run: |
+          cosign verify-blob platform-service.spdx.json \
+            --bundle platform-service.spdx.sigstore.json \
+            --certificate-identity "$EXPECTED_IDENTITY" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
       - name: Upload signed SBOM
         uses: actions/upload-artifact@v6
         with:
