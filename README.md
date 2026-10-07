@@ -13,6 +13,34 @@ The project combines:
 - GoCD continuous delivery
 - GitHub Actions CI and software supply-chain security
 
+## Architecture
+
+```mermaid
+flowchart TD
+    Repo["GitHub repository"] --> Actions["GitHub Actions"]
+    Repo --> GoCD["Local GoCD"]
+
+    Actions --> Checks["Unit tests, integration tests<br/>govulncheck and Trivy"]
+    Checks --> Image["Build API image<br/>Trivy image scan"]
+    Image --> SBOM["Generate SPDX SBOM<br/>Cosign sign and verify"]
+    SBOM --> Artifact["Upload SBOM and signature bundle"]
+
+    GoCD --> Verify["Unit tests, integration tests<br/>Trivy repository scan"]
+    Verify --> LocalImage["Build and scan local API image"]
+
+    Repo --> Terraform["Terraform"]
+    Terraform --> GCP["Google Cloud infrastructure<br/>IAM, remote state and budget"]
+    GCP --> Registry["Artifact Registry"]
+    GCP --> CloudRun["Private Cloud Run"]
+
+    Manual["Manual cloud image build and push"] --> Registry
+    Registry --> CloudRun
+    CloudRun --> API["Go REST API<br/>Health and service endpoints"]
+    API --> SQLite["SQLite: ephemeral on Cloud Run"]
+```
+
+GitHub Actions tests and scans the project, then generates, signs and verifies an SBOM. GoCD provides a separate local verification and image-build pipeline. Terraform manages the cloud infrastructure; cloud image publishing and deployment are manual. The initial Cloud Run deployment uses ephemeral SQLite storage.
+
 ## Current status
 
 The API currently provides:
