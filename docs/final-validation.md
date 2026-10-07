@@ -31,4 +31,4 @@ https://github.com/MusdafOmar/platform-service/actions/runs/37614305649
 - CI signs the SBOM, not the Docker image.
 - GoCD pipeline recreation from a fresh clone was not validated.
 
-These results support a learning-project submission, not a claim of production readiness. 
+These results support a learning-project submission, not a claim of production readiness.

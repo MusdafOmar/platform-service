@@ -974,8 +974,10 @@ SQLite in Cloud Run is therefore used only to verify that the deployed container
 10. GoCD pipeline — complete
 11. Trivy security scanning — complete
 12. Google Cloud deployment — initial Cloud Run deployment complete
-13. GitHub Actions and signed SBOM — implementation verified; documentation updated
-14. Final validation, demonstration and handoff — pending
+13. GitHub Actions and signed SBOM - complete
+14. Final validation and API demonstration - complete; submission handoff documented
+
+Validation results and known limitations: [Final validation](docs/final-validation.md).
 
 ## Security boundaries and limitations
 
